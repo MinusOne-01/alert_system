@@ -21,6 +21,11 @@ const worker = new Worker( "alert-queue", async (job) => {
     if (alert.status === "sent") {
       return;
     }
+    
+    if (alert.status === "cancelled") {
+        return;
+    }
+
 
     await prisma.alerts.update({
       where: { id: alertId },

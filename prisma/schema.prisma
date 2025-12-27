@@ -20,6 +20,8 @@ model Alerts {
   status     StatusType  @default(queued)
   retryCount Int         @default(0)
   payload    Json
+
+  scheduledAt DateTime?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -36,6 +38,8 @@ enum AlertType {
 
 enum StatusType {
   queued
+  scheduled
+  cancelled
   processing
   sent
   failed
