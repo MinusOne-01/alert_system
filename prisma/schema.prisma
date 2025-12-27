@@ -23,6 +23,8 @@ model Alerts {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
+  metrics    AlertDeliveryLog[]
+
   @@index([status])
   @@index([createdAt])
 }
@@ -38,3 +40,24 @@ enum StatusType {
   sent
   failed
 }
+
+model AlertDeliveryLog {
+  id        String   @id @default(uuid())
+  alertId   String
+  attempt   Int
+  status    DeliveryStatus
+  error     String?
+
+  createdAt DateTime @default(now())
+
+  alert     Alerts    @relation(fields: [alertId], references: [id])
+
+  @@index([alertId])
+  @@index([createdAt])
+}
+
+enum DeliveryStatus {
+  success
+  error
+}
+

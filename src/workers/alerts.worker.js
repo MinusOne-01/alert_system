@@ -1,6 +1,8 @@
 import { Worker } from "bullmq";
 import { prisma } from "../config/prisma.js";
+import { env } from "../config/env.js";
 import redis from "../config/redis.js";
+import { transporter } from "../config/mailer.js";
 
 const worker = new Worker( "alert-queue", async (job) => {
 
@@ -15,22 +17,71 @@ const worker = new Worker( "alert-queue", async (job) => {
       throw new Error(`Alert ${alertId} not found`);
     }
 
-    // Mark processing
+    // Idempotency guard
+    if (alert.status === "sent") {
+      return;
+    }
+
     await prisma.alerts.update({
       where: { id: alertId },
-      data: { status: "processing" }
+      data: { status: "processing", retryCount: job.attemptsMade }
     });
+     
+    try {
+        // send email
+        if (alert.type === "EMAIL") {
+            const { subject, body } = alert.payload;
 
-    // TEMP: simulate work
-    console.log(`Processing alert ${alertId}`);
+            await transporter.sendMail({
+                from: env.SMTP_USER,
+                to: alert.recipient,
+                subject,
+                text: body
+            });
+        }
 
-    // Simulate success
-    await prisma.alerts.update({
-      where: { id: alertId },
-      data: { status: "sent" }
-    });
+        await prisma.alertDeliveryLog.create({
+            data: {
+                alertId,
+                attempt: job.attemptsMade + 1,
+                status: "success"
+            }
+        });
 
-    return { success: true };
+        await prisma.alerts.update({
+            where: { id: alertId },
+            data: { status: "sent" }
+        });
+        console.log("Sent!");
+    }
+    catch (err) {
+        await prisma.alertDeliveryLog.create({
+            data: {
+                alertId,
+                attempt: job.attemptsMade + 1,
+                status: "error",
+                error: err.message
+            }
+        });
+
+        const isLastAttempt =
+            job.attemptsMade + 1 >= job.opts.attempts;
+
+        if (isLastAttempt) {
+            await prisma.alerts.update({
+                where: { id: alertId },
+                data: {
+                    status: "failed",
+                    retryCount: job.attemptsMade + 1
+                }
+            });
+            console.log("Failed!");
+        }
+        console.log("Retrying...");
+
+        throw err;
+    }
+
 
   }, { connection: redis });
 
