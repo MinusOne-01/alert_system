@@ -13,6 +13,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+///////////////////////////
+// Core Alerts
+///////////////////////////
+
 model Alerts {
   id         String      @id @default(uuid())
   type       AlertType
@@ -45,6 +49,12 @@ enum StatusType {
   failed
 }
 
+
+
+///////////////////////////
+// PushDevices
+///////////////////////////
+
 model PushDevice {
   id        String   @id @default(uuid())
   userId    String
@@ -61,6 +71,52 @@ enum PushPlatform {
   android
   ios
 }
+
+
+
+///////////////////////////
+// Webhooks
+///////////////////////////
+
+model Webhook {
+  id        String   @id @default(uuid())
+  url       String
+  secret    String
+  isActive  Boolean  @default(true)
+  metrics   WebhookDeliveryLog[]
+
+  createdAt DateTime @default(now())
+}
+
+
+
+///////////////////////////
+// WebhookDeliveryLogs
+///////////////////////////
+
+
+model WebhookDeliveryLog {
+  id        String   @id @default(uuid())
+  webhookId String
+  event     String
+  payload   Json
+  status    DeliveryStatus
+  error     String?
+
+  createdAt DateTime @default(now())
+
+  webhook   Webhook  @relation(fields: [webhookId], references: [id])
+
+  @@index([webhookId])
+  @@index([createdAt])
+}
+
+
+
+
+///////////////////////////
+// AlertDeliveryLogs
+///////////////////////////
 
 
 model AlertDeliveryLog {
@@ -82,4 +138,6 @@ enum DeliveryStatus {
   success
   error
 }
+
+
 

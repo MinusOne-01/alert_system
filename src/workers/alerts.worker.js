@@ -4,6 +4,7 @@ import { env } from "../config/env.js";
 import redis from "../config/redis.js";
 import { transporter } from "../config/mailer.js";
 import { sendPush } from "../push/pushSender.js";
+import { dispatchWebhook } from "../webhooks/dispatchWebhook.js";
 
 const worker = new Worker( "alert-queue", async (job) => {
 
@@ -75,6 +76,13 @@ const worker = new Worker( "alert-queue", async (job) => {
             where: { id: alertId },
             data: { status: "sent" }
         });
+        
+        // send webhook after db state change
+        await dispatchWebhook("alert.sent", {
+            alertId: alert.id,
+            type: alert.type,
+            recipient: alert.recipient
+        });
     }
     catch (err) {
         await prisma.alertDeliveryLog.create({
@@ -98,6 +106,14 @@ const worker = new Worker( "alert-queue", async (job) => {
                 }
             });
             console.log("Failed!");
+
+            // send webhook after db state change
+            await dispatchWebhook("alert.failed", {
+                alertId: alert.id,
+                type: alert.type,
+                recipient: alert.recipient,
+                retryCount: alert.retryCount
+            });
         }
         console.log("Retrying...");
 

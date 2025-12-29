@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { alertQueue } from "../../queues/alerts.queue.js";
+import { dispatchWebhook } from "../../webhooks/dispatchWebhook.js";
 
 export async function createAlert({ type, recipient, payload, scheduledAt }) {
   
@@ -53,6 +54,11 @@ export async function cancelAlert( id ) {
   const cancel = await prisma.alerts.update({
     where: { id },
     data: { status: "cancelled" }
+  });
+  
+  // send webhook after db state change
+  await dispatchWebhook("alert.cancelled", {
+    alertId: alert.id
   });
 
   console.log("Cancelled!");
