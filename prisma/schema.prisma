@@ -45,6 +45,24 @@ enum StatusType {
   failed
 }
 
+model PushDevice {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  PushPlatform
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum PushPlatform {
+  web
+  android
+  ios
+}
+
+
 model AlertDeliveryLog {
   id        String   @id @default(uuid())
   alertId   String

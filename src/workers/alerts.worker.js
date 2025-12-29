@@ -3,6 +3,7 @@ import { prisma } from "../config/prisma.js";
 import { env } from "../config/env.js";
 import redis from "../config/redis.js";
 import { transporter } from "../config/mailer.js";
+import { sendPush } from "../push/pushSender.js";
 
 const worker = new Worker( "alert-queue", async (job) => {
 
@@ -43,8 +44,25 @@ const worker = new Worker( "alert-queue", async (job) => {
                 subject,
                 text: body
             });
+            console.log("Sent email!");
         }
+        
+        // push notification
+        if (alert.type === "PUSH") {
+            const devices = await prisma.pushDevice.findMany({
+                where: { userId: alert.recipient }
+            });
 
+            const tokens = devices.map(d => d.token);
+
+            await sendPush({
+                tokens,
+                payload: alert.payload
+            });
+            console.log("Pushed noti!");
+        }
+        
+        // update db
         await prisma.alertDeliveryLog.create({
             data: {
                 alertId,
@@ -57,7 +75,6 @@ const worker = new Worker( "alert-queue", async (job) => {
             where: { id: alertId },
             data: { status: "sent" }
         });
-        console.log("Sent!");
     }
     catch (err) {
         await prisma.alertDeliveryLog.create({
